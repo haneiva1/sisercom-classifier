@@ -1,0 +1,12 @@
+services:
+  - type: cron
+    name: sisercom-clasificador
+    runtime: python
+    schedule: "0 12 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python classifier.py
+    envVars:
+      - key: KOMMO_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
