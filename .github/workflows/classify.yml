@@ -1,0 +1,26 @@
+name: Clasificador SISERCOM
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # 8am Bolivia (UTC-4)
+  workflow_dispatch:       # permite correrlo manualmente
+
+jobs:
+  clasificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Clasificar leads
+        env:
+          KOMMO_TOKEN: ${{ secrets.KOMMO_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python classifier.py
