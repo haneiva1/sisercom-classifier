@@ -12,8 +12,7 @@ BASE_URL    = "https://dcisnerossisercomevcom.kommo.com/api/v4"
 HEADERS     = {"Authorization": f"Bearer {KOMMO_TOKEN}", "Content-Type": "application/json"}
 
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash-exp")
-
+model = genai.GenerativeModel("gemini-2.0-flash")
 CF = {
     "canal_entrada":    {"id": 487630, "enums": {"WhatsApp":363850,"Instagram":363852,"Facebook":363854,"Formulario web":363856,"Referido":363858,"Llamada":363860,"Otro":363862}},
     "tipo_entrada":     {"id": 487632, "enums": {"Organico":363864,"Pagado":363866,"Referido":363868,"Directo":363870,"Desconocido":363872}},
