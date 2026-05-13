@@ -1,10 +1,6 @@
 """
 SISERCOM - Clasificador automatico de leads con IA
 Gemini 2.5 Flash + Kommo API. Corre en GitHub Actions 8am Bolivia.
-- Procesa del mas nuevo al mas viejo
-- Solo ultimos 60 dias (leads activos)
-- Max 20 leads por run (cuota gratuita Gemini: 20 RPD)
-- Con tarjeta: cambiar MAX_LEADS a 250
 """
 import os, json, time, requests
 import google.generativeai as genai
@@ -14,8 +10,6 @@ KOMMO_TOKEN = os.environ["KOMMO_TOKEN"]
 GEMINI_KEY  = os.environ["GEMINI_API_KEY"]
 BASE_URL    = "https://dcisnerossisercomevcom.kommo.com/api/v4"
 HEADERS     = {"Authorization": f"Bearer {KOMMO_TOKEN}", "Content-Type": "application/json"}
-
-MAX_LEADS = 20  # Con tarjeta cambiar a 250
 
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")
@@ -34,11 +28,11 @@ CF = {
 }
 
 
-def get_unclassified_leads(max_leads=MAX_LEADS):
-    """Leads sin clasificar: del mas nuevo, ultimos 60 dias, max MAX_LEADS."""
+def get_unclassified_leads():
+    """Leads sin clasificar: del mas nuevo, ultimos 60 dias, sin limite."""
     cutoff = int((datetime.now() - timedelta(days=60)).timestamp())
     leads, page = [], 1
-    while len(leads) < max_leads:
+    while True:
         r = requests.get(f"{BASE_URL}/leads", headers=HEADERS, params={
             "page": page, "limit": 250, "with": "contacts",
             "order[id]": "desc",
@@ -52,8 +46,6 @@ def get_unclassified_leads(max_leads=MAX_LEADS):
         if not batch:
             break
         for lead in batch:
-            if len(leads) >= max_leads:
-                break
             cfs = {cf["field_id"]: cf for cf in lead.get("custom_fields_values") or []}
             if CF["nivel_intencion"]["id"] not in cfs:
                 leads.append(lead)
@@ -154,7 +146,7 @@ def run():
     print(f"SISERCOM Clasificador - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"{'='*55}")
     leads = get_unclassified_leads()
-    print(f"\nLeads sin clasificar (ultimos 60 dias, max {MAX_LEADS}): {len(leads)}")
+    print(f"\nLeads sin clasificar (ultimos 60 dias): {len(leads)}")
     if not leads:
         print("Nada nuevo para clasificar.")
         return
@@ -177,7 +169,7 @@ def run():
         else:
             errors += 1
             print("  ERROR al guardar")
-        time.sleep(13)  # 5 RPM gratis = 1 req/12s; 13s con margen
+        time.sleep(0.5)
     print(f"\n{'='*55}")
     print(f"RESUMEN: {ok} OK | {errors} errores | {len(leads)} procesados")
     print(f"{'='*55}\n")
