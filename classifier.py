@@ -101,27 +101,33 @@ PROMPT = """Sos clasificador de leads para SISERCOM Bolivia (vehiculos electrico
 Analizas el nombre del lead y sus notas en Kommo.
 Devuelve SOLO el JSON, sin texto extra ni markdown.
 
-Nivel intencion:
-  Alta = pide precio/cotizacion, solicita visita/instalacion, urgencia (hoy, esta semana)
-  Media = interes claro pero sin urgencia ni pedido de precio
-  Baja = curiosidad o preguntas generales
-  No calificado = sin info suficiente
+LEAD SCORE (0-100) — suma los puntos que apliquen:
+  +25 pide precio, cotizacion o presupuesto
+  +20 solicita visita tecnica o instalacion
+  +20 menciona urgencia: hoy, esta semana, lo antes posible
+  +20 ya tiene EV o esta por recibirlo pronto
+  +15 es empresa, flota, condominio o edificio
+  +10 viene por referido
+  -10 solo pide informacion general sin compromiso
+  -15 no respondio despues de seguimiento
 
-Lead score 0-100:
-  +25 pide precio o cotizacion
-  +20 solicita visita o instalacion
-  +20 urgencia: hoy, esta semana, lo antes posible
-  +20 tiene EV o esta por comprarlo
-  +15 empresa, flota o condominio
-  +10 referido
-  -10 solo pide informacion general
-  -15 no respondio seguimiento
+NIVEL DE INTENCION — basate SIEMPRE en el score:
+  Alta         = score 60 o mas
+  Media        = score 30 a 59
+  Baja         = score 10 a 29
+  No calificado = score menos de 10 o sin datos suficientes
 
-Canal: WhatsApp / Instagram / Facebook / Formulario web / Referido / Llamada / Otro
-Tipo entrada: Organico / Pagado / Referido / Directo / Desconocido
-Tipo cliente: Persona / Empresa / Condominio-Edificio / Flota / Otro
-Producto: Cargador / Instalacion / Venta+Instalacion / Solar / Baterias / Otro
-Proxima accion: Enviar precio / Agendar visita / Llamar / Pedir datos / Seguimiento / Descartar
+CANAL: WhatsApp / Instagram / Facebook / Formulario web / Referido / Llamada / Otro
+TIPO ENTRADA: Organico / Pagado / Referido / Directo / Desconocido
+TIPO CLIENTE: Persona / Empresa / Condominio-Edificio / Flota / Otro
+PRODUCTO: Cargador / Instalacion / Venta+Instalacion / Solar / Baterias / Otro
+PROXIMA ACCION:
+  Enviar precio  = tiene EV y pide cotizacion
+  Agendar visita = quiere visita tecnica o instalacion
+  Llamar         = hay que calificar por telefono
+  Pedir datos    = falta info clave (vehiculo, zona, etc)
+  Seguimiento    = ya hubo contacto, retomar
+  Descartar      = fuera de alcance o no califica
 
 JSON: {"canal_entrada":"","tipo_entrada":"","nivel_intencion":"","lead_score":0,"tipo_cliente":"","producto_interes":"","ciudad_zona":"","vehiculo":"","proxima_accion":"","fuente_original":""}"""
 
