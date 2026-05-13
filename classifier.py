@@ -1,7 +1,6 @@
 """
 SISERCOM - Clasificador automatico de leads con IA
-Gemini 2.5 Flash + Kommo API. Corre en GitHub Actions 8am Bolivia.
-v2 - Lee conversaciones de WhatsApp ademas de notas
+v4 - Lee etapa del pipeline, etiquetas, campos existentes + notas
 """
 import os, json, time, requests
 import google.generativeai as genai
@@ -14,6 +13,22 @@ HEADERS     = {"Authorization": f"Bearer {KOMMO_TOKEN}", "Content-Type": "applic
 
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")
+
+STAGES = {
+    105087411: "Leads Entrantes",
+    105087415: "Contacto inicial",
+    105130443: "Solo info",
+    105122735: "No interesado",
+    105111343: "Interesado",
+    105124671: "Solicita programacion de visita",
+    105244923: "Otros intereses en VE",
+    105087419: "Visita tecnica programada",
+    105087423: "Cotizacion enviada",
+    105122979: "Pago anticipo",
+    105122983: "Pago saldo restante",
+    142:       "Realizado (ganado)",
+    143:       "Venta perdida",
+}
 
 CF = {
     "canal_entrada":   {"id": 487630, "enums": {"WhatsApp":363850,"Instagram":363852,"Facebook":363854,"Formulario web":363856,"Referido":363858,"Llamada":363860,"Otro":363862}},
@@ -28,19 +43,30 @@ CF = {
     "fuente_original": {"id": 487698},
 }
 
+CF_NAMES = {
+    487630: "Canal de entrada",
+    487632: "Tipo de entrada",
+    487676: "Tipo de cliente",
+    487678: "Producto de interes",
+    487680: "Ciudad/Zona",
+    487684: "Vehiculo",
+    487698: "Fuente original",
+}
+
 def get_unclassified_leads():
     cutoff = int((datetime.now() - timedelta(days=60)).timestamp())
     leads, page = [], 1
     while True:
         r = requests.get(f"{BASE_URL}/leads", headers=HEADERS, params={
-            "page": page, "limit": 250, "with": "contacts",
+            "page": page, "limit": 250,
+            "with": "contacts,tags",
             "order[id]": "desc",
             "filter[created_at][from]": cutoff
         })
         if r.status_code != 200:
-            print(f"  Error Kommo leads: {r.status_code}")
+            print(f"  Error Kommo: {r.status_code}")
             break
-        data = r.json()
+        data  = r.json()
         batch = data.get("_embedded", {}).get("leads", [])
         if not batch:
             break
@@ -62,71 +88,28 @@ def get_lead_notes(lid):
     for n in r.json().get("_embedded", {}).get("notes", []):
         p = n.get("params", {})
         if p.get("text"):
-            texts.append(f"[nota] {p['text']}")
-        if p.get("address"):
-            texts.append(f"[ubicacion] {p['address']}")
+            texts.append(p["text"])
     return "\n".join(texts)
 
-def get_lead_talk_id(lead):
-    """Obtiene el talk_id del lead desde los eventos recientes."""
-    lid = lead["id"]
-    r = requests.get(f"{BASE_URL}/events", headers=HEADERS, params={
-        "filter[entity_id][]": lid,
-        "filter[type][]": ["incoming_chat_message", "outgoing_chat_message"],
-        "limit": 1,
-        "order[created_at]": "desc"
-    })
-    if r.status_code != 200:
-        return None
-    events = r.json().get("_embedded", {}).get("events", [])
-    if not events:
-        return None
-    msg = events[0].get("value_after", [{}])[0].get("message", {})
-    return msg.get("talk_id")
+def build_context(lead):
+    lid   = lead["id"]
+    name  = lead.get("name", f"Lead #{lid}")
+    stage = STAGES.get(lead.get("status_id"), "Desconocida")
+    tags  = [t["name"] for t in lead.get("_embedded", {}).get("tags", [])]
+    cfs   = {cf["field_id"]: cf for cf in lead.get("custom_fields_values") or []}
 
-def get_talk_messages(talk_id):
-    """Lee los mensajes de WhatsApp/Instagram del talk. Requiere scope 'chats'."""
-    r = requests.get(f"{BASE_URL}/talks/{talk_id}/messages", headers=HEADERS, params={"limit": 50})
-    if r.status_code == 403:
-        return None, "scope_missing"
-    if r.status_code != 200:
-        return None, f"error_{r.status_code}"
-    messages = r.json().get("_embedded", {}).get("messages", [])
-    lines = []
-    for m in messages:
-        sender = "Cliente" if m.get("author", {}).get("type") == "contact" else "Equipo"
-        content = m.get("content", {})
-        text = content.get("text") or content.get("type", "")
-        if text:
-            lines.append(f"{sender}: {text}")
-    return "\n".join(lines), "ok"
-
-def get_all_context(lead):
-    """
-    Combina notas + conversacion de WhatsApp para el prompt.
-    Si no hay scope de chats, cae graciosamente a solo notas.
-    """
-    lid = lead["id"]
+    lines = [f"Lead: {name}", f"Etapa del pipeline: {stage}"]
+    if tags:
+        lines.append(f"Etiquetas: {', '.join(tags)}")
+    for fid, fname in CF_NAMES.items():
+        if fid in cfs:
+            val = cfs[fid]["values"][0].get("value", "")
+            if val:
+                lines.append(f"{fname}: {val}")
     notes = get_lead_notes(lid)
-
-    talk_id = get_lead_talk_id(lead)
-    conversation = ""
-    chat_status = "no_talk"
-
-    if talk_id:
-        messages, chat_status = get_talk_messages(talk_id)
-        if messages:
-            conversation = messages
-        elif chat_status == "scope_missing":
-            print(f"    ! Sin scope 'chats' -- solo usando notas")
-
-    parts = []
     if notes:
-        parts.append(f"=== NOTAS DEL EQUIPO ===\n{notes}")
-    if conversation:
-        parts.append(f"=== CONVERSACION WHATSAPP/INSTAGRAM ===\n{conversation}")
-
-    return "\n\n".join(parts) if parts else "", chat_status
+        lines.append(f"\nNotas del equipo:\n{notes}")
+    return "\n".join(lines), stage, tags
 
 def update_lead_fields(lid, c):
     fields = []
@@ -155,41 +138,43 @@ def update_lead_fields(lid, c):
     return r.status_code == 200
 
 PROMPT = """Sos clasificador de leads para SISERCOM Bolivia (vehiculos electricos y cargadores EV).
-Analizas el nombre del lead, sus notas y la conversacion de WhatsApp/Instagram.
+Recibis el contexto completo: etapa del pipeline, etiquetas, campos y notas.
 Devuelve SOLO el JSON, sin texto extra ni markdown.
 
-LEAD SCORE (0-100) -- suma los puntos que apliquen:
-+25 pide precio, cotizacion o presupuesto
-+20 solicita visita tecnica o instalacion
-+20 menciona urgencia: hoy, esta semana, lo antes posible
-+20 ya tiene EV o esta por recibirlo pronto
-+15 es empresa, flota, condominio o edificio
+ETAPAS Y SU SIGNIFICADO:
+- Leads Entrantes / Contacto inicial = nuevo, sin calificar
+- Solo info = baja intencion, solo consulta
+- No interesado = descartar
+- Interesado = hay interes, calificar
+- Solicita programacion de visita = ALTA intencion
+- Visita tecnica programada = MUY ALTA intencion
+- Cotizacion enviada = MUY ALTA intencion
+- Pago anticipo / Pago saldo = cliente confirmado
+- Realizado = ganado | Venta perdida = perdido
+
+LEAD SCORE (0-100):
++30 etapa Solicita visita / Visita programada / Cotizacion enviada
++20 etapa Interesado
++25 pide precio o cotizacion en notas
++20 menciona urgencia: hoy, esta semana
++20 ya tiene EV o esta por recibirlo
++15 es empresa, flota, condominio
 +10 viene por referido
--10 solo pide informacion general sin compromiso
--15 no respondio despues de seguimiento
+-10 solo info
+-15 no respondio
+Etapa Venta perdida o No interesado = score 0, accion Descartar
 
-NIVEL DE INTENCION -- basate SIEMPRE en el score:
-Alta = score 60 o mas
-Media = score 30 a 59
-Baja = score 10 a 29
-No calificado = score menos de 10 o sin datos suficientes
-
+NIVEL: Alta=60+ | Media=30-59 | Baja=10-29 | No calificado=menos de 10
 CANAL: WhatsApp / Instagram / Facebook / Formulario web / Referido / Llamada / Otro
 TIPO ENTRADA: Organico / Pagado / Referido / Directo / Desconocido
 TIPO CLIENTE: Persona / Empresa / Condominio-Edificio / Flota / Otro
 PRODUCTO: Cargador / Instalacion / Venta+Instalacion / Solar / Baterias / Otro
-PROXIMA ACCION:
-Enviar precio    = tiene EV y pide cotizacion
-Agendar visita   = quiere visita tecnica o instalacion
-Llamar           = hay que calificar por telefono
-Pedir datos      = falta info clave (vehiculo, zona, etc)
-Seguimiento      = ya hubo contacto, retomar
-Descartar        = fuera de alcance o no califica
+PROXIMA ACCION: Enviar precio | Agendar visita | Llamar | Pedir datos | Seguimiento | Descartar
 
 JSON: {"canal_entrada":"","tipo_entrada":"","nivel_intencion":"","lead_score":0,"tipo_cliente":"","producto_interes":"","ciudad_zona":"","vehiculo":"","proxima_accion":"","fuente_original":""}"""
 
-def classify_lead(name, context, cinfo=""):
-    prompt = f"{PROMPT}\n\nLead: {name}\nContacto: {cinfo}\n\n{context or '(sin informacion disponible)'}\n\nClasifica:"
+def classify_lead(context):
+    prompt = f"{PROMPT}\n\nCONTEXTO:\n{context}\n\nClasifica:"
     try:
         resp = model.generate_content(prompt)
         text = resp.text.strip()
@@ -204,53 +189,34 @@ def classify_lead(name, context, cinfo=""):
 
 def run():
     print(f"\n{'='*55}")
-    print(f"SISERCOM Clasificador v2 - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"SISERCOM Clasificador v4 - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"Fuentes: etapa + etiquetas + campos + notas")
     print(f"{'='*55}")
-
     leads = get_unclassified_leads()
     print(f"\nLeads sin clasificar (ultimos 60 dias): {len(leads)}")
     if not leads:
         print("Nada nuevo para clasificar.")
         return
-
-    ok = errors = scope_warnings = 0
-
+    ok = errors = 0
     for i, lead in enumerate(leads, 1):
-        lid  = lead["id"]
-        name = lead.get("name", f"Lead #{lid}")
-        contacts = lead.get("_embedded", {}).get("contacts", [])
-        cinfo = ", ".join([c.get("name", "") for c in contacts if c.get("name")])
-        print(f"\n[{i}/{len(leads)}] {name} (#{lid})")
-
-        context, chat_status = get_all_context(lead)
-
-        has_convo = "CONVERSACION" in context
-        has_notes = "NOTAS" in context
-        src = []
-        if has_notes:    src.append("notas")
-        if has_convo:    src.append("WhatsApp")
-        if chat_status == "scope_missing": scope_warnings += 1
-        print(f"  Fuentes: {', '.join(src) if src else 'ninguna'}")
-
-        result = classify_lead(name, context, cinfo)
+        name = lead.get("name", f"Lead #{lead['id']}")
+        print(f"\n[{i}/{len(leads)}] {name} (#{lead['id']})")
+        context, stage, tags = build_context(lead)
+        print(f"  Etapa: {stage} | Tags: {tags or 'ninguna'}")
+        result = classify_lead(context)
         if not result:
             errors += 1
             continue
-
-        print(f"  {result.get('nivel_intencion')} | score:{result.get('lead_score')} | {result.get('proxima_accion')}")
-        if update_lead_fields(lid, result):
+        print(f"  → {result.get('nivel_intencion')} | score:{result.get('lead_score')} | {result.get('proxima_accion')}")
+        if update_lead_fields(lead["id"], result):
             ok += 1
             print(f"  OK")
         else:
             errors += 1
-            print(f"  ERROR al guardar")
-
-        time.sleep(0.5)
-
+            print(f"  ERROR")
+        time.sleep(0.4)
     print(f"\n{'='*55}")
     print(f"RESUMEN: {ok} OK | {errors} errores | {len(leads)} procesados")
-    if scope_warnings:
-        print(f"AVISO: {scope_warnings} leads sin scope 'chats' -- actualizar token en GitHub Secrets")
     print(f"{'='*55}\n")
 
 if __name__ == "__main__":
