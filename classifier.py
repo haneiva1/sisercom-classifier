@@ -17,17 +17,17 @@ model = genai.GenerativeModel("gemini-2.5-flash-lite")
 STAGES = {
     105087411: "Leads Entrantes",
     105087415: "Contacto inicial",
-    105130443: "Solo info",
-    105122735: "No interesado",
     105111343: "Interesado",
-    105124671: "Solicita programacion de visita",
-    105244923: "Otros intereses en VE",
-    105087419: "Visita tecnica programada",
-    105087423: "Cotizacion enviada",
+    105124671: "Solicita visita",
+    105087419: "Visita agendada",
+    105087423: "Cotización enviada",
     105122979: "Pago anticipo",
-    105122983: "Pago saldo restante",
-    142:       "Realizado (ganado)",
-    143:       "Venta perdida",
+    105122983: "Saldo pendiente",
+    105244923: "Otros intereses en VE",
+    105130443: "Solo información",
+    105122735: "No interesado",
+    142: "Realizado (ganado)",
+    143: "Venta perdida",
 }
 
 CF = {
