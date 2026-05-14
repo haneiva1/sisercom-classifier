@@ -1,6 +1,6 @@
 """
 SISERCOM - Clasificador automatico de leads con IA
-v4.1 - gemini-2.0-flash (sin thinking, 25x mas barato)
+v4.1 - gemini-2.5-flash-lite (thinking OFF por defecto, ~$0.02/run)
 """
 import os, json, time, requests
 import google.generativeai as genai
@@ -12,7 +12,7 @@ BASE_URL    = "https://dcisnerossisercomevcom.kommo.com/api/v4"
 HEADERS     = {"Authorization": f"Bearer {KOMMO_TOKEN}", "Content-Type": "application/json"}
 
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel("gemini-2.0-flash")
+model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
 STAGES = {
     105087411: "Leads Entrantes",
