@@ -48,7 +48,7 @@ CF = {
     "producto_interes":{"id": 487678, "enums": {"Cargador":363924,"Instalacion":363926,"Venta+Instalacion":363928,"Solar":363930,"Baterias":363932,"Otro":363934}},
     "ciudad_zona":     {"id": 487680},
     "vehiculo":        {"id": 487684},
-    "proxima_accion":  {"id": 487696, "enums": {"Enviar precio":363956,"Agendar visita":363958,"Llamar":363960,"Pedir datos":363962,"Seguimiento":363964,"Descartar":363966}},
+    "proxima_accion":  {"id": 487696, "enums": {"Enviar precio":363946,"Agendar visita":363948,"Llamar":363950,"Pedir datos":363952,"Seguimiento":363954,"Descartar":363956}},
     "fuente_original": {"id": 487698},
 }
 CF_NAMES = {487630:"Canal", 487632:"Tipo entrada", 487654:"Nivel", 487656:"Score", 487676:"Tipo cliente", 487678:"Producto", 487680:"Ciudad", 487684:"Vehiculo", 487696:"Proxima accion"}
