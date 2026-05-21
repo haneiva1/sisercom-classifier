@@ -175,7 +175,7 @@ def update_lead_fields(lid, c, existing_tags, real_canal=None):
     num("lead_score",       c.get("lead_score"))
     sel("tipo_cliente",     c.get("tipo_cliente"))
     sel("producto_interes", c.get("producto_interes"))
-    txt("ciudad_zona",      c.get("ciudad_zona"))
+    raw_c=(c.get("ciudad_zona") or "").lower(); sel("ciudad_zona","La Paz" if "paz" in raw_c else ("Santa Cruz" if "cruz" in raw_c else ("Otra" if raw_c else None)))
     txt("vehiculo",         c.get("vehiculo"))
     sel("proxima_accion",   c.get("proxima_accion"))
     txt("fuente_original",  c.get("fuente_original"))
