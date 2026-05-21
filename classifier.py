@@ -46,7 +46,7 @@ CF = {
     "lead_score":      {"id": 487656},
     "tipo_cliente":    {"id": 487676, "enums": {"Persona":363914,"Empresa":363916,"Condominio/Edificio":363918,"Flota":363920,"Otro":363922}},
     "producto_interes":{"id": 487678, "enums": {"Cargador":363924,"Instalacion":363926,"Venta+Instalacion":363928,"Solar":363930,"Baterias":363932,"Otro":363934}},
-    "ciudad_zona":     {"id": 488800},
+    "ciudad_zona":     {"id": 488310, "enums": {"La Paz":364674,"Santa Cruz":364676,"Otra":364678}},
     "vehiculo":        {"id": 488316},
     "proxima_accion":  {"id": 487696, "enums": {"Enviar precio":363946,"Agendar visita":363948,"Llamar":363950,"Pedir datos":363952,"Seguimiento":363954,"Descartar":363956}},
     "fuente_original": {"id": 487698},
