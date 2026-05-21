@@ -1,6 +1,6 @@
 """
 SISERCOM - Clasificador automatico de leads con IA
-v4.2 - gemini-2.5-flash-lite + canal real (talks) + tags automaticos
+v4.3 - fix HTTP 204 + logging errores Kommo
 """
 import os, json, time, requests
 import google.generativeai as genai
@@ -219,7 +219,10 @@ def update_lead_fields(lid, c, existing_tags, real_canal=None):
     if len(payload) == 1:
         return True
     r = requests.patch(f"{BASE_URL}/leads", headers=HEADERS, json=[payload])
-    return r.status_code == 200
+    if r.status_code not in (200, 201, 204):
+        print(f"  PATCH fallo: HTTP {r.status_code} | {r.text[:300]}")
+        return False
+    return True
 
 PROMPT = """Sos clasificador de leads para SISERCOM Bolivia (vehiculos electricos y cargadores EV).
 Recibis el contexto completo: etapa del pipeline, etiquetas, campos y notas.
