@@ -1,6 +1,6 @@
 """
 SISERCOM - Clasificador automatico de leads con IA
-v4.5 - IDs SISERCOM (SISE-XXXXX) para todos los leads
+v4.6 - IDs SISERCOM + paginacion completa en bulk
 """
 import os, json, time, requests
 import google.generativeai as genai
@@ -273,7 +273,7 @@ def get_leads_without_id():
     """Leads de todos los tiempos que ya tienen nivel pero no tienen ID SISERCOM."""
     leads = []
     page = 1
-    while page <= 20:
+    while True:
         r = requests.get(f"{BASE_URL}/leads", headers=HEADERS, params={
             "page": page, "limit": 250,
             "with": "contacts,tags",
@@ -289,7 +289,9 @@ def get_leads_without_id():
             cfs = {cf["field_id"]: cf for cf in lead.get("custom_fields_values") or []}
             if CF["id_sisercom"]["id"] not in cfs:
                 leads.append(lead)
-        if page >= data.get("_page_count", 1):
+        total_pages = data.get("_page_count", 1)
+        print(f"  pagina {page}/{total_pages}, sin_id acumulados: {len(leads)}")
+        if page >= total_pages:
             break
         page += 1
         time.sleep(0.2)
