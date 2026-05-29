@@ -1,6 +1,6 @@
 """
 SISERCOM - Clasificador automatico de leads con IA
-v4.4 - fix IDs campo ciudad y vehiculo
+v4.5 - IDs SISERCOM (SISE-XXXXX) para todos los leads
 """
 import os, json, time, requests
 import google.generativeai as genai
@@ -50,6 +50,7 @@ CF = {
     "vehiculo":        {"id": 488316},
     "proxima_accion":  {"id": 487696, "enums": {"Enviar precio":363946,"Agendar visita":363948,"Llamar":363950,"Pedir datos":363952,"Seguimiento":363954,"Descartar":363956}},
     "fuente_original": {"id": 487698},
+    "id_sisercom":    {"id": 489858},
 }
 CF_NAMES = {487630:"Canal", 487632:"Tipo entrada", 487654:"Nivel", 487656:"Score", 487676:"Tipo cliente", 487678:"Producto", 487680:"Ciudad", 487684:"Vehiculo", 487696:"Proxima accion"}
 
@@ -216,6 +217,13 @@ def update_lead_fields(lid, c, existing_tags, real_canal=None):
     if set(new_tags) != set(existing_tags):
         payload["_embedded"] = {"tags": [{"name": t} for t in new_tags]}
     
+    # ID SISERCOM: SISE-XXXXX basado en el ID de Kommo, solo si no tiene ya
+    if "id_sisercom" not in [f["field_id"] for cf in [payload.get("custom_fields_values", [])] for f in cf]:
+        sise_id = f"SISE-{lid:05d}"
+        fields.append({"field_id": CF["id_sisercom"]["id"], "values": [{"value": sise_id}]})
+        if fields:
+            payload["custom_fields_values"] = fields
+
     if len(payload) == 1:
         return True
     r = requests.patch(f"{BASE_URL}/leads", headers=HEADERS, json=[payload])
@@ -260,6 +268,48 @@ PROXIMA ACCION: Enviar precio | Agendar visita | Llamar | Pedir datos | Seguimie
 
 JSON: {"canal_entrada":"","tipo_entrada":"","nivel_intencion":"","lead_score":0,"tipo_cliente":"","producto_interes":"","ciudad_zona":"","vehiculo":"","proxima_accion":"","fuente_original":""}"""
 
+
+def get_leads_without_id():
+    """Leads de todos los tiempos que ya tienen nivel pero no tienen ID SISERCOM."""
+    leads = []
+    page = 1
+    while page <= 20:
+        r = requests.get(f"{BASE_URL}/leads", headers=HEADERS, params={
+            "page": page, "limit": 250,
+            "with": "contacts,tags",
+            "order[id]": "asc",
+        })
+        if r.status_code != 200:
+            break
+        data = r.json()
+        batch = data.get("_embedded", {}).get("leads", [])
+        if not batch:
+            break
+        for lead in batch:
+            cfs = {cf["field_id"]: cf for cf in lead.get("custom_fields_values") or []}
+            if CF["id_sisercom"]["id"] not in cfs:
+                leads.append(lead)
+        if page >= data.get("_page_count", 1):
+            break
+        page += 1
+        time.sleep(0.2)
+    return leads
+
+def assign_ids_only(leads):
+    """Solo asigna ID SISERCOM a leads que no lo tienen. No reclasifica."""
+    ok = 0
+    for lead in leads:
+        lid = lead["id"]
+        sise_id = f"SISE-{lid:05d}"
+        payload = [{"id": lid, "custom_fields_values": [
+            {"field_id": CF["id_sisercom"]["id"], "values": [{"value": sise_id}]}
+        ]}]
+        r = requests.patch(f"{BASE_URL}/leads", headers=HEADERS, json=payload)
+        if r.status_code in (200, 201, 204):
+            ok += 1
+        time.sleep(0.15)
+    return ok
+
 def classify_lead(context):
     prompt = f"{PROMPT}\n\nCONTEXTO:\n{context}\n\nClasifica:"
     try:
@@ -285,6 +335,17 @@ def run():
     origins = get_lead_origins()
     print(f"  {len(origins)} leads con origen identificado")
     
+    # PASO 1: asignar ID SISERCOM a todos los leads que no lo tienen
+    print("\nAsignando IDs SISERCOM a leads sin ID...")
+    leads_sin_id = get_leads_without_id()
+    if leads_sin_id:
+        print(f"  {len(leads_sin_id)} leads sin ID -> asignando...")
+        ids_ok = assign_ids_only(leads_sin_id)
+        print(f"  {ids_ok} IDs asignados OK")
+    else:
+        print("  Todos los leads ya tienen ID SISERCOM")
+
+    # PASO 2: clasificar leads sin nivel_intencion
     leads = get_unclassified_leads()
     print(f"\nLeads sin clasificar (ultimos 60 dias): {len(leads)}")
     if not leads:
