@@ -24,7 +24,7 @@ KOMMO_TOKEN = os.environ["KOMMO_TOKEN"]
 GEMINI_KEY  = os.environ["GEMINI_API_KEY"]
 MODEL       = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
 WINDOW_DAYS = int(os.environ.get("WINDOW_DAYS", "0"))     # 0 = todos los leads
-MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN", "150"))   # tope de clasificaciones IA por corrida
+MAX_PER_RUN = int(os.environ.get("MAX_PER_RUN", "300"))   # tope de clasificaciones IA por corrida
 
 BASE_URL = "https://dcisnerossisercomevcom.kommo.com/api/v4"
 HEADERS  = {"Authorization": f"Bearer {KOMMO_TOKEN}", "Content-Type": "application/json"}
@@ -130,7 +130,6 @@ def get_lead_origins():
         for t in talks:
             if t.get("entity_type") == "lead" and t.get("entity_id") and t["entity_id"] not in origins:
                 origins[t["entity_id"]] = t.get("origin")
-        if page >= d.get("_page_count", 1): break
         page += 1; time.sleep(0.2)
     return origins
 
@@ -150,7 +149,6 @@ def get_contact_map():
                 if code == "PHONE" and not tel:   tel   = vals[0].get("value")
                 if code == "EMAIL" and not email: email = vals[0].get("value")
             cmap[c["id"]] = {"nombre": c.get("name"), "tel": tel, "email": email}
-        if page >= d.get("_page_count", 1): break
         page += 1; time.sleep(0.2)
     return cmap
 
@@ -167,7 +165,6 @@ def get_all_leads():
         batch = d.get("_embedded", {}).get("leads", [])
         if not batch: break
         leads += batch
-        if page >= d.get("_page_count", 1): break
         page += 1; time.sleep(0.2)
     return leads
 
