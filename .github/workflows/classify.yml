@@ -2,19 +2,24 @@ name: Clasificador SISERCOM
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # 8am Bolivia (UTC-4)
-  workflow_dispatch:       # permite correrlo manualmente
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: clasificador
+  cancel-in-progress: false
 
 jobs:
   clasificar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Instalar dependencias
         run: pip install -r requirements.txt
